@@ -12,7 +12,7 @@ Output files:
 import sys
 import copy
 
-input_file = 'input2.txt'
+input_file = 'input.txt'
 
 class Process:
     last_scheduled_time = 0
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     FCFS_schedule, FCFS_avg_waiting_time =  FCFS_scheduling(process_list)
     write_output('FCFS.txt', FCFS_schedule, FCFS_avg_waiting_time )
     print ("simulating RR ----")
-    RR_schedule, RR_avg_waiting_time =  RR_scheduling(process_list,time_quantum = 10)
+    RR_schedule, RR_avg_waiting_time =  RR_scheduling(process_list,time_quantum = 2)
     write_output('RR.txt', RR_schedule, RR_avg_waiting_time )
     print ("simulating SRTF ----")
     SRTF_schedule, SRTF_avg_waiting_time =  SRTF_scheduling(process_list)
