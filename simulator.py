@@ -16,6 +16,7 @@ input_file = 'input.txt'
 
 class Process:
     last_scheduled_time = 0
+    predict_time = 0
     def __init__(self, id, arrive_time, burst_time, index):
         self.id = id
         self.arrive_time = arrive_time
@@ -23,7 +24,7 @@ class Process:
         self.index = index
     #for printing purpose
     def __repr__(self):
-        return ('[id %d : arrival_time %d,  burst_time %d]'%(self.id, self.arrive_time, self.burst_time))
+        return ('[id %d : arrival_time %d,  burst_time %d, predict_time %d]'%(self.id, self.arrive_time, self.burst_time, self.predict_time))
 
 def FCFS_scheduling(process_list):
     #store the (switching time, proccess_id) pair
@@ -53,38 +54,37 @@ def RR_scheduling(process_list, time_quantum ):
     process_no = len(process_list_cp)
     while process_queue != [] or process_list_cp!= []:
         if process_queue == []:
-            process_queue.append(process_list_cp[0])
-            current_time = process_list_cp[0].arrive_time
-            process_list_cp.pop(0)
+            current_process = process_list_cp.pop(0)
+            current_process.last_scheduled_time = current_process.arrive_time
+            process_queue.append(current_process)
+            current_time = current_process.arrive_time
         else:
             current_process = process_queue.pop(0)
+            # update wait time and last scheduled time
+            waiting_time = waiting_time + current_time - current_process.last_scheduled_time
             # Append to schedule if it's not the same process as the last quantum
             if schedule == [] or current_process.index != schedule_idx[-1]:
                 schedule.append((current_time, current_process.id, current_process.index))
                 schedule_idx.append(current_process.index)
-                # update wait time and last scheduled time
-                waiting_time = waiting_time + current_time - current_process.last_scheduled_time
-                current_process.last_scheduled_time = current_time + time_quantum
+
             # update current time and remaining time of current process
-            # current time = the time when current process ends
+            # current time = the time when current process ends + 1
             if current_process.burst_time > time_quantum:
                 current_time = current_time + time_quantum
                 current_process.burst_time = current_process.burst_time - time_quantum
+                current_process.last_scheduled_time = current_time
             else:
                 current_time = current_time + current_process.burst_time
                 current_process.burst_time = 0
-            process_queue_no = 0
+
             # add process arrived by current time in queue
-            for process in process_list_cp:
-                if process.arrive_time <= current_time:
-                    process.last_scheduled_time = process.arrive_time
-                    process_queue.append(process)
-                    process_queue_no = process_queue_no + 1
+            while process_list_cp != []:
+                if process_list_cp[0].arrive_time <= current_time:
+                    process_list_cp[0].last_scheduled_time = process_list_cp[0].arrive_time
+                    process_queue.append(process_list_cp.pop(0))
                 else:
                     break
-            # clear process list
-            for i in range(process_queue_no):
-                process_list_cp.pop(0)
+
             # Append current process to end of queue
             if current_process.burst_time > 0:
                 process_queue.append(current_process)
@@ -100,48 +100,105 @@ def SRTF_scheduling(process_list):
     current_time = 0
     waiting_time = 0
     process_queue = []
-    process_list_cp = process_list.copy()
+    process_list_cp = copy.deepcopy(process_list)
     process_no = len(process_list_cp)
 
     while process_queue != [] or process_list_cp!= []:
         if process_queue == []:
-            process_queue.append(process_list_cp[0])
-            current_time = process_list_cp[0].arrive_time
-            process_list_cp.pop(0)
+            current_process = process_list_cp.pop(0)
+            current_process.last_scheduled_time = current_process.arrive_time
+            process_queue.append(current_process)
+            current_time = current_process.arrive_time
         else:
+            current_process = process_queue.pop(0)
+            if schedule == [] or current_process.index != schedule_idx[-1]:
+                schedule.append((current_time, current_process.id, current_process.index))
+                schedule_idx.append(current_process.index)
+                waiting_time = waiting_time + current_time - current_process.last_scheduled_time
+
             if process_list_cp != []:
                 next_arrival_process = process_list_cp[0]
                 next_arrival_process.last_scheduled_time = next_arrival_process.arrive_time
-                if schedule == [] or process_queue[0].index != schedule_idx[-1]:
-                    schedule.append((current_time, process_queue[0].id, process_queue[0].index))
-                    schedule_idx.append(process_queue[0].index)
-                    waiting_time = waiting_time + current_time - process_queue[0].last_scheduled_time
-                # If next arrival is earlier than the completion of current process
-                if next_arrival_process.arrive_time <= current_time + process_queue[0].burst_time:
-                    exec_time = next_arrival_process.arrive_time - current_time
-                    current_time = current_time + exec_time
-                    process_queue[0].burst_time = process_queue[0].burst_time - exec_time
-                    process_queue[0].last_scheduled_time = current_time
+                # If next arrival is earlier than the completion of current process, insert in queue
+                if next_arrival_process.arrive_time <= current_time + current_process.burst_time:
+                    current_process.burst_time = current_process.burst_time - (next_arrival_process.arrive_time - current_time)
+                    current_time = next_arrival_process.arrive_time
+                    current_process.last_scheduled_time = current_time
+                    process_queue.append(current_process)
                     process_queue.append(next_arrival_process)
                     process_queue.sort(key=lambda x: x.burst_time, reverse=False)
                     process_list_cp.pop(0)
                 else:
-                    current_time = current_time + process_queue[0].burst_time
-                    process_queue.pop(0)
-            else:
-                for process in process_queue:
-                    if schedule == [] or process.index != schedule_idx[-1]:
-                        schedule.append((current_time, process.id, process.index))
-                        schedule_idx.append(process.index)
-                        waiting_time = waiting_time + current_time - process.last_scheduled_time
-                        process.last_scheduled_time = current_time
-                    current_time = current_time + process.burst_time
-                process_queue=[]
+                    current_time = current_time + current_process.burst_time
+            else: # No more process arriving
+                current_time = current_time + current_process.burst_time
 
     average_waiting_time = waiting_time/float(process_no)
     return schedule, average_waiting_time
 def SJF_scheduling(process_list, alpha):
-    return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
+    #return (["to be completed, scheduling process_list on SRTF, using process.burst_time to calculate the remaining time of the current process "], 0.0)
+    schedule = []
+    schedule_idx = []
+    current_time = 0
+    waiting_time = 0
+    process_queue = []
+    process_list_cp = copy.deepcopy(process_list)
+    process_no = len(process_list_cp)
+    last_burst = dict()
+    last_predict = dict()
+    while process_queue != [] or process_list_cp!= []:
+        if process_queue == []:
+            current_process = process_list_cp.pop(0)
+            if current_process.id in last_burst:
+                current_process.predict_time = last_burst.get(current_process.id) * alpha + last_predict.get(current_process.id) * (1-alpha)
+            else:
+                current_process.predict_time = 5 #initial guess
+            process_queue.append(current_process)
+            current_time = current_process.arrive_time
+
+        else:
+            # This process will run to end
+            current_process = process_queue.pop(0)
+            # Append to schedule if it's not the same process as the last quantum
+            if schedule == [] or current_process.index != schedule_idx[-1]:
+                schedule.append((current_time, current_process.id, current_process.index))
+                schedule_idx.append(current_process.index)
+                waiting_time = waiting_time + current_time - current_process.arrive_time
+            # current_time = the time when current process ends + 1
+            current_time = current_time + current_process.burst_time
+            # add process arrived before current time in queue
+            while process_list_cp != []:
+                if process_list_cp[0].arrive_time < current_time:
+                    process = process_list_cp.pop(0)
+                    if process.id in last_burst:
+                        process.predict_time = last_burst.get(process.id) * alpha + last_predict.get(process.id) * (1-alpha)
+                    else:
+                        process.predict_time = 5 #initial guess
+                    process_queue.append(process)
+                else:
+                    break
+
+            # When will last burst time be known?
+            last_burst[current_process.id] = current_process.burst_time
+            last_predict[current_process.id] = current_process.predict_time
+
+            # add process arrived AT current time in queue
+            while process_list_cp != []:
+                if process_list_cp[0].arrive_time == current_time:
+                    process = process_list_cp.pop(0)
+                    if process.id in last_burst:
+                        process.predict_time = last_burst.get(process.id) * alpha + last_predict.get(process.id) * (1-alpha)
+                    else:
+                        process.predict_time = 5 #initial guess
+                    process_queue.append(process)
+                else:
+                    break
+
+            process_queue.sort(key=lambda x: x.predict_time, reverse=False)
+
+    average_waiting_time = waiting_time/float(process_no)
+    return schedule, average_waiting_time
+    #return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
 
 
 def read_input():
